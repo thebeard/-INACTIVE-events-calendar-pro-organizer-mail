@@ -43,7 +43,6 @@ class WC_Event_Organizer_Email extends WC_Email {
 
 		// Call parent constructor to load any other defaults not explicity defined here
 		parent::__construct();
-		$this->email_type = 'html';
 	}
 
 
