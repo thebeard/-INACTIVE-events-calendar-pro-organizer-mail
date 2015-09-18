@@ -20,18 +20,18 @@ define('WC_EVENT_ORGANIZER_TEMPLATE_DIR', WC_EVENT_ORGANIZER_PLGN_DIR . 'templat
 /**
  *  Add a custom email to the list of emails WooCommerce should load
  *
- * @since 0.1
+ * @since 1.0.1
  * @param array $email_classes available email classes
  * @return array filtered available email classes
  */
 function add_event_organizer_woocommerce_mail( $email_classes ) {
-
-	// include our custom email class
+	
+	// Include custom extended WC_Email class
 	require_once( 'includes/class-wc-event-organizer-email.php' );
 
-	// add the email class to the list of email classes that WooCommerce loads
+	// Include Custom Email Notification
 	$email_classes['WC_Event_Organizer_Email'] = new WC_Event_Organizer_Email();
-
+	
 	return $email_classes;
 
 }

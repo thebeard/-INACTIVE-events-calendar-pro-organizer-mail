@@ -5,43 +5,40 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 /**
  * A custom Event Organizer Email
  *
- * @since 0.1
+ * @since 1.0.1
  * @extends \WC_Email
  */
 class WC_Event_Organizer_Email extends WC_Email {
 
 	/**
-	 * Set email defaults
+	 * Set Constructor Function
 	 *
-	 * @since 0.1
+	 * @since 1.0.1
 	 */
 	public function __construct() {
 
-		// set ID, this simply needs to be a unique name
+		// Instantiating properties
 		$this->id = 'wc_event_organizer_email_lmbk';
-
-		// this is the title in WooCommerce Email settings
 		$this->title = 'Event Organizer Email';
-
-		// this is the description in WooCommerce email settings
 		$this->description = 'Sent to the organizer of an event';
 
-		// these are the default heading and subject lines that can be overridden using the settings
+		// Instatntiating default properties, overridden in WooCommerce Settings
 		$this->heading = 'Ticket(s) purchased';
 		$this->subject = 'Ticket(s) purchased';
 
-		// these define the locations of the templates that this email should use		
+		// Template locations defined
 		$this->template_base = WC_EVENT_ORGANIZER_TEMPLATE_DIR;
 		$this->template_html  = 'emails/event-organizer-notification.php';
 		$this->template_plain = 'emails/plain/event-organizer-notification.php';
 
+		// Adds an option to resend this mail from Order Edit Screen
 		add_action( 'woocommerce_resend_order_emails_available', array( $this, 'add_resend_event_organizer_action' ) );
 
-		// Trigger on new paid orders
+		// Trigger on newly paid orders
 		//add_action( 'woocommerce_order_status_pending_to_processing_notification', array( $this, 'trigger' ) );
 		//add_action( 'woocommerce_order_status_failed_to_processing_notification',  array( $this, 'trigger' ) );
 
-		// Call parent constructor to load any other defaults not explicity defined here
+		// Parent Constructor
 		parent::__construct();
 	}
 
@@ -49,43 +46,62 @@ class WC_Event_Organizer_Email extends WC_Email {
 	/**
 	 * Determine if the email should actually be sent and setup email merge variables
 	 *
-	 * @since 0.1
+	 * @since 1.0.1
 	 * @param int $order_id
 	 */
 	public function trigger( $order_id ) {
-		// bail if no order ID is present
-		if ( ! $order_id )
-			return;
 
-		// setup order object
+		// Exit if no order id present
+		if ( ! $order_id ) return;
+
+		// If this order has no tickets, exit
+		$has_tickets = get_post_meta( $order_id, '_tribe_has_tickets', true );
+		if ( ! $has_tickets ) return $emails; 
+
+		// Instantiate Order Object
 		$this->object = new WC_Order();
 		$this->object->get_order( $order_id );
 
+		// Set up a few variables for use later
 		$orderItems = $this->object->get_items();
-		$productIDs = array();
-
 		$organizersToNotify = array();
 		$ticketLog = array();
 
-		if ( class_exists(Tribe__Events__Tickets__Woo__Main) ) {
+		// Make sure Tribe Events Plugin is activated
+		if ( class_exists( 'Tribe__Events__Tickets__Woo__Main' ) ) {
 			$tribe_event = Tribe__Events__Tickets__Woo__Main::get_instance();
+
+			// Loop over order items / tickets
 			foreach( $orderItems as $orderID => $orderMeta ) {
+
 				$productID = $orderMeta['product_id'];
 				$event_id = get_post_meta( $productID, '_tribe_wooticket_for_event', true );
+
+				// If this is not an event ticket, continue
+				if ( !$event_id ) continue;
+
+				// If this ticket has not been added to our custom array, add now
 				if ( !isset($ticketLog[$productID]) ) {
 					$ticketLog[$productID] = array (
 						'name' => get_the_title( $productID  ),
 						'qty' => 0,
 					);
 				}
+
+				// Update this ticket's quantity ( In case multiple lines of the same ticket exists)
 				$ticketLog[$productID]['qty'] = $ticketLog[$productID]['qty'] + $orderMeta['qty'];
 
+				// Get Event Meta Array and all Organizers added for this event
 				$eventMeta = tribe_get_event_meta( $event_id );
 				$eventOrganizerIDs = $eventMeta['_EventOrganizerID'];
+
+				// Loop over Organizers for this event
 				foreach( $eventOrganizerIDs as $eventOrganizerID ) {
-					$eventOrganizer = get_post( $eventOrganizerID );
+
+					// Collect this Organizer's email address
 					$eventOrganizerEmail = tribe_get_organizer_email( $eventOrganizerID );
 
+					// If the event, associated with this looping line item ( product ) has not yet been added to the array...
 					if ( !isset($organizersToNotify[$eventOrganizerEmail][$event_id] ) )
 						$organizersToNotify[$eventOrganizerEmail][$event_id] = array(
 							'name' => get_the_title($event_id),
@@ -94,22 +110,24 @@ class WC_Event_Organizer_Email extends WC_Email {
 								$productID => $ticketLog[$productID]
 							)
 						);
-					else {
+					else { // ... just add the the ticket(s) to already existing events
 						$organizersToNotify[$eventOrganizerEmail][$event_id]['tickets'][$productID] = $ticketLog[$productID];
 					}
 				}
 			}
 
-			// replace variables in the subject/headings
+			// Replace variables in the subject/headings
 			$this->find[] = '{order_date}';
 			$this->replace[] = date_i18n( woocommerce_date_format(), strtotime( $this->object->order_date ) );
 
 			$this->find[] = '{order_number}';
 			$this->replace[] = $this->object->get_order_number();
 
+			// Exit if his email is not enabled ( Could possible move to the top? )
 			if ( ! $this->is_enabled() )
 				return;
 
+			// Now loop over all collected organizers and send each one email for all tickets assigned to this organizer
 			foreach( $organizersToNotify as $organizer_email => $event_info ) {
 				$GLOBALS['lmbk_event_info'] = array (
 					'order_link' => get_edit_post_link( $order_id ),

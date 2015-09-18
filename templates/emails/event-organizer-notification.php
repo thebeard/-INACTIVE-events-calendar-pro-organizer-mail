@@ -11,9 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 	global $lmbk_event_info;
-	$base            = get_option( 'woocommerce_email_base_color' );
-	$base_text       = '#ffffff';
-	if ( function_exists( 'wc_light_or_dark' ) ) $base_text       = wc_light_or_dark( $base, '#202020', '#ffffff' );
+	$base = get_option( 'woocommerce_email_base_color' );
+	$base_text = '#ffffff';
+	if ( function_exists( 'wc_light_or_dark' ) ) $base_text = wc_light_or_dark( $base, '#202020', '#ffffff' );
 ?>
 
 <?php do_action( 'woocommerce_email_header', $email_heading ); ?>
