@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: Events Calendar Pro Event Organizer Email
- * Plugin URI: http://limbik.co.za
- * Description: Send a custom email to an event organizer specified within the structure of the Events Calendar Pro plugin
+ * Plugin Name: Events Calendar Event Organizer Email
+ * Plugin URI: https://github.com/thebeard/events-calendar-pro-organizer-mail
+ * Description: Send a custom email to an event organizer specified within the structure of the Events Calendar plugin
  * Author: Theunis Cilliers
- * Author URI: http://limbik.co.za
+ * Author URI: https://github.com/thebeard
  * Version: 1.0.1
  *
  * License: GNU General Public License v3.0
