@@ -27,8 +27,8 @@ class WC_Event_Organizer_Email extends WC_Email {
 		$this->description = 'Sent to the organizer of an event';
 
 		// these are the default heading and subject lines that can be overridden using the settings
-		$this->heading = 'A ticket has just been purchased';
-		$this->subject = 'A ticket has just been purchased';
+		$this->heading = 'Ticket(s) purchased';
+		$this->subject = 'Ticket(s) purchased';
 
 		// these define the locations of the templates that this email should use		
 		$this->template_base = WC_EVENT_ORGANIZER_TEMPLATE_DIR;
@@ -53,7 +53,6 @@ class WC_Event_Organizer_Email extends WC_Email {
 	 * @param int $order_id
 	 */
 	public function trigger( $order_id ) {
-
 		// bail if no order ID is present
 		if ( ! $order_id )
 			return;
@@ -61,19 +60,64 @@ class WC_Event_Organizer_Email extends WC_Email {
 		// setup order object
 		$this->object = new WC_Order();
 		$this->object->get_order( $order_id );
-		$recipient = get_bloginfo( 'admin_email' );		
 
-		// replace variables in the subject/headings
-		$this->find[] = '{order_date}';
-		$this->replace[] = date_i18n( woocommerce_date_format(), strtotime( $this->object->order_date ) );
+		$orderItems = $this->object->get_items();
+		$productIDs = array();
 
-		$this->find[] = '{order_number}';
-		$this->replace[] = $this->object->get_order_number();
+		$organizersToNotify = array();
+		$ticketLog = array();
 
-		if ( ! $this->is_enabled() )
-			return;
+		if ( class_exists(Tribe__Events__Tickets__Woo__Main) ) {
+			$tribe_event = Tribe__Events__Tickets__Woo__Main::get_instance();
+			foreach( $orderItems as $orderID => $orderMeta ) {
+				$productID = $orderMeta['product_id'];
+				$event_id = get_post_meta( $productID, '_tribe_wooticket_for_event', true );
+				if ( !isset($ticketLog[$productID]) ) {
+					$ticketLog[$productID] = array (
+						'name' => get_the_title( $productID  ),
+						'qty' => 0,
+					);
+				}
+				$ticketLog[$productID]['qty'] = $ticketLog[$productID]['qty'] + $orderMeta['qty'];
 
-		$this->send( $recipient, $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );
+				$eventMeta = tribe_get_event_meta( $event_id );
+				$eventOrganizerIDs = $eventMeta['_EventOrganizerID'];
+				foreach( $eventOrganizerIDs as $eventOrganizerID ) {
+					$eventOrganizer = get_post( $eventOrganizerID );
+					$eventOrganizerEmail = tribe_get_organizer_email( $eventOrganizerID );
+
+					if ( !isset($organizersToNotify[$eventOrganizerEmail][$event_id] ) )
+						$organizersToNotify[$eventOrganizerEmail][$event_id] = array(
+							'name' => get_the_title($event_id),
+							'edit_post' => get_edit_post_link($event_id),
+							'tickets' => array(
+								$productID => $ticketLog[$productID]
+							)
+						);
+					else {
+						$organizersToNotify[$eventOrganizerEmail][$event_id]['tickets'][$productID] = $ticketLog[$productID];
+					}
+				}
+			}
+
+			// replace variables in the subject/headings
+			$this->find[] = '{order_date}';
+			$this->replace[] = date_i18n( woocommerce_date_format(), strtotime( $this->object->order_date ) );
+
+			$this->find[] = '{order_number}';
+			$this->replace[] = $this->object->get_order_number();
+
+			if ( ! $this->is_enabled() )
+				return;
+
+			foreach( $organizersToNotify as $organizer_email => $event_info ) {
+				$GLOBALS['lmbk_event_info'] = array (
+					'order_link' => get_edit_post_link( $order_id ),
+					'meta' => $event_info
+				);
+				$this->send( $organizer_email, $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );	
+			}
+		}		
 	}
 
 
@@ -85,13 +129,14 @@ class WC_Event_Organizer_Email extends WC_Email {
 	 */
 	public function get_content_html() {
 		ob_start();
-		woocommerce_get_template( $this->template_html, array(
-			'order'         => $this->object,
-			'email_heading' => $this->get_heading()
-		), ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
+		if ( function_exists( 'woocommerce_get_template') ) {
+			woocommerce_get_template( $this->template_html, array(
+				'order'         => $this->object,
+				'email_heading' => $this->get_heading()
+			), ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
+		}
 		return ob_get_clean();
 	}
-
 
 	/**
 	 * get_content_plain function.
@@ -101,10 +146,12 @@ class WC_Event_Organizer_Email extends WC_Email {
 	 */
 	public function get_content_plain() {
 		ob_start();
-		woocommerce_get_template( $this->template_plain, array(
-			'order'         => $this->object,
-			'email_heading' => $this->get_heading()
-		),  ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
+		if ( function_exists( 'woocommerce_get_template') ) {
+			woocommerce_get_template( $this->template_plain, array(
+				'order'         => $this->object,
+				'email_heading' => $this->get_heading()
+			),  ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
+		}
 		return ob_get_clean();
 	}
 
