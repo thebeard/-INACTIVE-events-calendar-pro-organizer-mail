@@ -63,8 +63,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 		// setup order object
 		$this->object = new WC_Order( $order_id );
 		// $this->object->get_order( $order_id );
-		// $recipient = get_bloginfo( 'admin_email' );
-		$recipient = 'theunis@limbik.co.za';
+		$recipient = get_bloginfo( 'admin_email' );		
 
 		// replace variables in the subject/headings
 		$this->find[] = '{order_date}';
