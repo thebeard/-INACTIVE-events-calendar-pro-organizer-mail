@@ -10,7 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
  */
 class WC_Event_Organizer_Email extends WC_Email {
 
-
 	/**
 	 * Set email defaults
 	 *
@@ -44,7 +43,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 
 		// Call parent constructor to load any other defaults not explicity defined here
 		parent::__construct();
-
+		$this->email_type = 'html';
 	}
 
 
@@ -61,8 +60,8 @@ class WC_Event_Organizer_Email extends WC_Email {
 			return;
 
 		// setup order object
-		$this->object = new WC_Order( $order_id );
-		// $this->object->get_order( $order_id );
+		$this->object = new WC_Order();
+		$this->object->get_order( $order_id );
 		$recipient = get_bloginfo( 'admin_email' );		
 
 		// replace variables in the subject/headings
@@ -90,7 +89,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 		woocommerce_get_template( $this->template_html, array(
 			'order'         => $this->object,
 			'email_heading' => $this->get_heading()
-		) );
+		), ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
 		return ob_get_clean();
 	}
 
@@ -106,7 +105,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 		woocommerce_get_template( $this->template_plain, array(
 			'order'         => $this->object,
 			'email_heading' => $this->get_heading()
-		) );
+		),  ' ', WC_EVENT_ORGANIZER_TEMPLATE_DIR );
 		return ob_get_clean();
 	}
 
@@ -169,7 +168,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 			return $emails;
 		}
 
-		$has_tickets = get_post_meta( $order, $this->order_has_tickets, true );
+		$has_tickets = get_post_meta( $order, '_tribe_has_tickets', true );
 
 		if ( ! $has_tickets ) {
 			return $emails;
