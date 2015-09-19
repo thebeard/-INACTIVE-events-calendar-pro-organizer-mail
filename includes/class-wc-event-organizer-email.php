@@ -2,6 +2,9 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
+// Used in email template file
+$lmbk_event_info = array();
+
 /**
  * A custom Event Organizer Email
  *
@@ -65,6 +68,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 		$this->object->get_order( $order_id );
 
 		// Set up a few variables for use later
+		global $lmbk_event_info;
 		$orderItems = $this->object->get_items();
 		$organizersToNotify = array();
 		$ticketLog = array();
@@ -130,7 +134,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 			// Now loop over all collected organizers and send each one email for all tickets assigned to this organizer
 			if ( !empty( $organizersToNotify) ) {
 				foreach( $organizersToNotify as $organizer_email => $event_info ) {
-					$GLOBALS['lmbk_event_info'] = array (
+					$lmbk_event_info = array (
 						'order_link' => get_edit_post_link( $order_id ),
 						'meta' => $event_info
 					);
