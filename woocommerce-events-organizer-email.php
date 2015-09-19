@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 define('WC_EVENT_ORGANIZER_PLGN_DIR', plugin_dir_path( __FILE__ ) );
 define('WC_EVENT_ORGANIZER_TEMPLATE_DIR', WC_EVENT_ORGANIZER_PLGN_DIR . 'templates/' );
+define('WC_EVENT_ORGANIZER_PLGN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
  *  Add a custom email to the list of emails WooCommerce should load
@@ -36,3 +37,12 @@ function add_event_organizer_woocommerce_mail( $email_classes ) {
 
 }
 add_filter( 'woocommerce_email_classes', 'add_event_organizer_woocommerce_mail' );
+
+function evnt_org_email_admin_head() {
+	$screen = get_current_screen();
+	if ( $screen->base == 'woocommerce_page_wc-settings' && $_GET['tab'] == 'email' && $_GET['section'] == 'wc_event_organizer_email' ) {
+		wp_enqueue_style( 'evt_org_email_css', WC_EVENT_ORGANIZER_PLGN_URL . 'includes/css/' . 'style.css' );
+		wp_enqueue_script( 'evt_org_email_js', WC_EVENT_ORGANIZER_PLGN_URL . 'includes/js/' . 'script.js', 'jquery' );
+	}
+}
+add_action( 'admin_enqueue_scripts', 'evnt_org_email_admin_head' );

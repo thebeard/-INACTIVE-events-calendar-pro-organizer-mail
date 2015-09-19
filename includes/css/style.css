@@ -1,0 +1,3 @@
+tr.hide-next + tr {
+	display: none;
+}

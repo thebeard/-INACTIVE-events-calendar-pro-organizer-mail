@@ -136,19 +136,47 @@ class WC_Event_Organizer_Email extends WC_Email {
 				foreach( $organizersToNotify as $organizer_email => $event_info ) {
 					$lmbk_event_info = array (
 						'order_link' => get_edit_post_link( $order_id ),
-						'meta' => $event_info
+						'meta' => $event_info,
+						'show_links' => ( $this->get_option( 'edit_links' ) == 'no' ) ? false : true
 					);
+
+					// Establish who to mail
+					$this->find_validate_recipient( $organizer_email, $this->get_option( 'recipient' ) );
+					
 					$this->send( $organizer_email, $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );	
 				}
 			}
 		}		
 	}
 
+	/**
+	 * find_validate_recipient function.
+	 *
+	 * @since 1.0.1
+	 * @return string
+	 */
+	private function find_validate_recipient( &$organizer_email, $recipient_selection ) {
+		switch( $recipient_selection ) {
+			case 'recipient_other':
+				$other_recipient = $this->get_option( 'other_recipient' );
+				if ( is_email( $other_recipient ) ) $organizer_email = $other_recipient;
+				else $organizer_email = get_bloginfo( 'admin_email' );
+				break;										
+			case 'recipient_new_order':
+				$new_order_email = new WC_Email_New_Order();
+				$organizer_email = $new_order_email->get_option( 'recipient' );
+			case 'recipient_event_specific':
+				if ( is_email( $organizer_email ) ) break;						
+			case 'recipient_site_admin':
+				$organizer_email = get_bloginfo( 'admin_email' );
+				break;
+		}
+	}
 
 	/**
 	 * get_content_html function.
 	 *
-	 * @since 0.1
+	 * @since 1.0.1
 	 * @return string
 	 */
 	public function get_content_html() {
@@ -165,7 +193,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 	/**
 	 * get_content_plain function.
 	 *
-	 * @since 0.1
+	 * @since 1.0.1
 	 * @return string
 	 */
 	public function get_content_plain() {
@@ -183,16 +211,23 @@ class WC_Event_Organizer_Email extends WC_Email {
 	/**
 	 * Initialize Settings Form Fields
 	 *
-	 * @since 2.0
+	 * @since 1.0.1
 	 */
 	public function init_form_fields() {
+
+		// Find currently selected recipient
+		$selector = $this->get_option( 'recipient' );
+		if ( isset( $_POST['woocommerce_wc_event_organizer_email_lmbk_recipient'] ) ) $selector = $_POST['woocommerce_wc_event_organizer_email_lmbk_recipient']; 
+		
+		// Set variable for 'Other:' option under recipients
+		$other = ( $selector == 'recipient_other' ) ? ' other' : '';
 
 		$this->form_fields = array(
 			'enabled'    => array(
 				'title'   => 'Enable/Disable',
 				'type'    => 'checkbox',
 				'label'   => 'Enable this email notification',
-				'default' => 'yes'
+				'default' => 'no'
 			),			
 			'subject'    => array(
 				'title'       => 'Email subject',
@@ -218,7 +253,33 @@ class WC_Event_Organizer_Email extends WC_Email {
 					'plain'	    => __( 'Plain text', 'woocommerce' ),
 					'html' 	    => __( 'HTML', 'woocommerce' )
 				)
-			)
+			),
+			'recipient' => array(
+				'title'       => 'Recipient(s)',
+				'type'        => 'select',
+				'description' => 'Override event organizer specified per event',
+				'default'     => 'site_admin_recipient',
+				'class'       => 'email_recipient' . $other,
+				'options'     => array(
+					'recipient_event_specific'  => __( 'Recipient specified per event', 'woocommerce' ),
+					'recipient_new_order'  		=> __( 'Recipient specified for new order', 'woocommerce' ),					
+					'recipient_site_admin'		=> __( 'Website Administrator', 'woocommerce' ),
+					'recipient_other'		=> __( 'Other:', 'woocommerce' )
+				)
+			),
+			'other_recipient' => array(
+				'title'       => '',
+				'type'        => 'text',
+				'description' => '',
+				'placeholder' => 'your@email.com',
+				'default'     => ''
+			),
+			'edit_links'	  => array(
+				'title'		  => 'Edit Links',
+				'label'       => 'Add event and order edit links in event organizer email',
+				'type'        => 'checkbox',
+				'default'     => 'yes'
+			),
 		);
 	}
 
