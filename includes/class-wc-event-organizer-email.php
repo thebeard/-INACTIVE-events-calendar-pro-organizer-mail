@@ -23,8 +23,8 @@ class WC_Event_Organizer_Email extends WC_Email {
 		$this->description = 'Sent to the organizer of an event';
 
 		// Instatntiating default properties, overridden in WooCommerce Settings
-		$this->heading = 'Ticket(s) purchased';
-		$this->subject = 'Ticket(s) purchased';
+		$this->heading = 'New ticket activity';
+		$this->subject = 'New ticket activity';
 
 		// Template locations defined
 		$this->template_base = WC_EVENT_ORGANIZER_TEMPLATE_DIR;
@@ -34,14 +34,17 @@ class WC_Event_Organizer_Email extends WC_Email {
 		// Adds an option to resend this mail from Order Edit Screen
 		add_action( 'woocommerce_resend_order_emails_available', array( $this, 'add_resend_event_organizer_action' ) );
 
-		// Trigger on newly paid orders
-		//add_action( 'woocommerce_order_status_pending_to_processing_notification', array( $this, 'trigger' ) );
-		//add_action( 'woocommerce_order_status_failed_to_processing_notification',  array( $this, 'trigger' ) );
+		// Notification hooks copied from the New Order. Should trigger as soon as order is made
+		add_action( 'woocommerce_order_status_pending_to_processing_notification', array( $this, 'trigger' ) );
+		add_action( 'woocommerce_order_status_pending_to_completed_notification', array( $this, 'trigger' ) );
+		add_action( 'woocommerce_order_status_pending_to_on-hold_notification', array( $this, 'trigger' ) );
+		add_action( 'woocommerce_order_status_failed_to_processing_notification', array( $this, 'trigger' ) );
+		add_action( 'woocommerce_order_status_failed_to_completed_notification', array( $this, 'trigger' ) );
+		add_action( 'woocommerce_order_status_failed_to_on-hold_notification', array( $this, 'trigger' ) );
 
 		// Parent Constructor
 		parent::__construct();
 	}
-
 
 	/**
 	 * Determine if the email should actually be sent and setup email merge variables
@@ -50,13 +53,12 @@ class WC_Event_Organizer_Email extends WC_Email {
 	 * @param int $order_id
 	 */
 	public function trigger( $order_id ) {
-
 		// Exit if no order id present
 		if ( ! $order_id ) return;
 
-		// If this order has no tickets, exit
-		$has_tickets = get_post_meta( $order_id, '_tribe_has_tickets', true );
-		if ( ! $has_tickets ) return $emails; 
+		// Exit if his email is not enabled
+		if ( ! $this->is_enabled() )
+			return;
 
 		// Instantiate Order Object
 		$this->object = new WC_Order();
@@ -72,46 +74,48 @@ class WC_Event_Organizer_Email extends WC_Email {
 			$tribe_event = Tribe__Events__Tickets__Woo__Main::get_instance();
 
 			// Loop over order items / tickets
-			foreach( $orderItems as $orderID => $orderMeta ) {
+			if ( !empty( $orderItems ) ) {
+				foreach( $orderItems as $orderID => $orderMeta ) {
 
-				$productID = $orderMeta['product_id'];
-				$event_id = get_post_meta( $productID, '_tribe_wooticket_for_event', true );
+					$product_id = $orderMeta['product_id'];
+					$event_id = get_post_meta( $product_id, '_tribe_wooticket_for_event', true );
 
-				// If this is not an event ticket, continue
-				if ( !$event_id ) continue;
+					// If this is not an event ticket, continue
+					if ( !$event_id ) continue;
 
-				// If this ticket has not been added to our custom array, add now
-				if ( !isset($ticketLog[$productID]) ) {
-					$ticketLog[$productID] = array (
-						'name' => get_the_title( $productID  ),
-						'qty' => 0,
-					);
-				}
-
-				// Update this ticket's quantity ( In case multiple lines of the same ticket exists)
-				$ticketLog[$productID]['qty'] = $ticketLog[$productID]['qty'] + $orderMeta['qty'];
-
-				// Get Event Meta Array and all Organizers added for this event
-				$eventMeta = tribe_get_event_meta( $event_id );
-				$eventOrganizerIDs = $eventMeta['_EventOrganizerID'];
-
-				// Loop over Organizers for this event
-				foreach( $eventOrganizerIDs as $eventOrganizerID ) {
-
-					// Collect this Organizer's email address
-					$eventOrganizerEmail = tribe_get_organizer_email( $eventOrganizerID );
-
-					// If the event, associated with this looping line item ( product ) has not yet been added to the array...
-					if ( !isset($organizersToNotify[$eventOrganizerEmail][$event_id] ) )
-						$organizersToNotify[$eventOrganizerEmail][$event_id] = array(
-							'name' => get_the_title($event_id),
-							'edit_post' => get_edit_post_link($event_id),
-							'tickets' => array(
-								$productID => $ticketLog[$productID]
-							)
+					// If this ticket has not been added to our custom array, add now
+					if ( !isset($ticketLog[$product_id]) ) {
+						$ticketLog[$product_id] = array (
+							'name' => get_the_title( $product_id  ),
+							'qty' => 0,
 						);
-					else { // ... just add the the ticket(s) to already existing events
-						$organizersToNotify[$eventOrganizerEmail][$event_id]['tickets'][$productID] = $ticketLog[$productID];
+					}
+
+					// Update this ticket's quantity ( In case multiple lines of the same ticket exists)
+					$ticketLog[$product_id]['qty'] = $ticketLog[$product_id]['qty'] + $orderMeta['qty'];
+
+					// Get Event Meta Array and all Organizers added for this event
+					$eventMeta = tribe_get_event_meta( $event_id );
+					$eventOrganizerIDs = $eventMeta['_EventOrganizerID'];
+
+					// Loop over Organizers for this event
+					foreach( $eventOrganizerIDs as $event_organizer_id ) {
+
+						// Collect this Organizer's email address
+						$eventOrganizerEmail = tribe_get_organizer_email( $event_organizer_id );
+
+						// If the event, associated with this looping line item ( product ) has not yet been added to the array...
+						if ( !isset($organizersToNotify[$eventOrganizerEmail][$event_id] ) )
+							$organizersToNotify[$eventOrganizerEmail][$event_id] = array(
+								'name' => get_the_title($event_id),
+								'edit_post' => get_edit_post_link($event_id),
+								'tickets' => array(
+									$product_id => $ticketLog[$product_id]
+								)
+							);
+						else { // ... just add the the ticket(s) to already existing events
+							$organizersToNotify[$eventOrganizerEmail][$event_id]['tickets'][$product_id] = $ticketLog[$product_id];
+						}
 					}
 				}
 			}
@@ -121,19 +125,17 @@ class WC_Event_Organizer_Email extends WC_Email {
 			$this->replace[] = date_i18n( woocommerce_date_format(), strtotime( $this->object->order_date ) );
 
 			$this->find[] = '{order_number}';
-			$this->replace[] = $this->object->get_order_number();
-
-			// Exit if his email is not enabled ( Could possible move to the top? )
-			if ( ! $this->is_enabled() )
-				return;
+			$this->replace[] = $this->object->get_order_number();			
 
 			// Now loop over all collected organizers and send each one email for all tickets assigned to this organizer
-			foreach( $organizersToNotify as $organizer_email => $event_info ) {
-				$GLOBALS['lmbk_event_info'] = array (
-					'order_link' => get_edit_post_link( $order_id ),
-					'meta' => $event_info
-				);
-				$this->send( $organizer_email, $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );	
+			if ( !empty( $organizersToNotify) ) {
+				foreach( $organizersToNotify as $organizer_email => $event_info ) {
+					$GLOBALS['lmbk_event_info'] = array (
+						'order_link' => get_edit_post_link( $order_id ),
+						'meta' => $event_info
+					);
+					$this->send( $organizer_email, $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );	
+				}
 			}
 		}		
 	}
@@ -183,7 +185,7 @@ class WC_Event_Organizer_Email extends WC_Email {
 
 		$this->form_fields = array(
 			'enabled'    => array(
-				'title'   => 'Active',
+				'title'   => 'Enable/Disable',
 				'type'    => 'checkbox',
 				'label'   => 'Enable this email notification',
 				'default' => 'yes'
@@ -191,14 +193,14 @@ class WC_Event_Organizer_Email extends WC_Email {
 			'subject'    => array(
 				'title'       => 'Email subject',
 				'type'        => 'text',
-				'description' => 'Defaults to <code>' . $this->subject . '</code>.',
+				'description' => 'Defaults to <code>' . $this->subject . '</code>',
 				'placeholder' => '',
 				'default'     => ''
 			),
 			'heading'    => array(
 				'title'       => 'Email heading',
 				'type'        => 'text',
-				'description' => 'Defaults to <code>' . $this->heading . '</code>.',
+				'description' => 'Defaults to <code>' . $this->heading . '</code>',
 				'placeholder' => '',
 				'default'     => ''
 			),
@@ -232,8 +234,8 @@ class WC_Event_Organizer_Email extends WC_Email {
 			return $emails;
 		}
 
+		// Remove these lines to make resending email available when order is in 'Processing' status
 		$has_tickets = get_post_meta( $order, '_tribe_has_tickets', true );
-
 		if ( ! $has_tickets ) {
 			return $emails;
 		}
